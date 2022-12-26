@@ -3,18 +3,18 @@ use smart_home::home::SmartHouse;
 use smart_home::providers::{BorrowingDeviceInfoProvider, OwningDeviceInfoProvider};
 
 fn main() {
-    let socket1 = SmartSocket::new("socket 1");
-    let socket2 = SmartSocket::new("socket 2");
-    let thermo = SmartThermometer::new("thermometer1");
+    let socket1 = SmartSocket::new("socket1");
+    let socket2 = SmartSocket::new("socket2");
+    let thermo1 = SmartThermometer::new("thermometer1");
 
     let house = SmartHouse::new("Smart House")
-        .add_room("room 1", &["socket 1"])
-        .add_room("room 2", &["socket 2", "thermo 1"]);
+        .add_room("room 1", &["socket1"])
+        .add_room("room 2", &["socket2", "thermometer1"]);
     let info_provider_1 = OwningDeviceInfoProvider { socket: socket1 };
 
     let info_provider_2 = BorrowingDeviceInfoProvider {
+        thermo: &thermo1,
         socket: &socket2,
-        thermo: &thermo,
     };
 
     let report1 = house.create_report(&info_provider_1);

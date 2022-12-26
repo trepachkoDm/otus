@@ -38,14 +38,12 @@ mod tests {
     fn test_structs_socket() {
         let socket = SmartSocket::new("socket1");
         assert_eq!(socket.name, "socket1");
-        assert_eq!(socket.data, true);
         assert_eq!(socket.power, 1);
     }
     #[test]
     fn test_structs_thermometer() {
         let thermometer = SmartThermometer::new("thermometer1");
         assert_eq!(thermometer.name, "thermometer1");
-        assert_eq!(thermometer.data, true);
         assert_eq!(thermometer.temperature, 1);
     }
 }

@@ -16,8 +16,11 @@ impl SmartHouse {
         }
     }
 
-    pub fn get_rooms(&self) -> Vec<&String> {
-        self.rooms.keys().collect()
+    pub fn get_rooms(&self) -> Option<Vec<&String>> {
+        match self.rooms.len() {
+            0 => None,
+            _ => Some(self.rooms.keys().collect()),
+        }
     }
 
     pub fn devices(&self, room: &str) -> Option<&Vec<String>> {
@@ -31,17 +34,17 @@ impl SmartHouse {
     }
 
     pub fn create_report<T: DeviceInfoProvider>(&self, info_provider: &T) -> String {
-        {
-            let mut report = format!("{:?}", self.name);
-            for (room_name, device_name) in self.rooms.iter() {
-                for name in device_name {
-                    if let Some(info) = info_provider.info(room_name, name) {
-                        writeln!(report, "{}", info).unwrap();
-                    }
-                }
+        let mut report = format!("");
+        for (room_name, device) in self.rooms.iter() {
+            for device_name in device {
+                write!(report, "{} - Device {} : ", room_name, device_name).unwrap();
+                match info_provider.get_device_info(device_name) {
+                    Ok(s) => writeln!(report, "{}", s).unwrap(),
+                    Err(e) => writeln!(report, "{:?}", e).unwrap(),
+                };
             }
-            report
         }
+        report
     }
 }
 
@@ -58,7 +61,7 @@ mod tests {
     #[test]
     fn test_get_rooms() {
         let home = SmartHouse::new("SM").add_room("room_name", &["device_name"]);
-        assert_eq!(home.get_rooms(), vec!["room_name"]);
+        assert_ne!(home.get_rooms(), None);
     }
 
     #[test]
