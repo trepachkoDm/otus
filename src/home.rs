@@ -1,11 +1,16 @@
-use crate::providers::DeviceInfoProvider;
+use crate::providers::Device;
 use std::collections::HashMap;
 use std::fmt::Write;
+use std::rc::Rc;
 
-#[derive(Debug, PartialEq, Eq)]
 pub struct SmartHouse {
     pub name: String,
-    pub rooms: HashMap<String, Vec<String>>,
+    pub rooms: HashMap<String, Room>,
+}
+
+pub struct Room {
+    name: String,
+    devices: HashMap<String, Rc<dyn Device>>,
 }
 
 impl SmartHouse {
@@ -16,30 +21,31 @@ impl SmartHouse {
         }
     }
 
-    pub fn get_rooms(&self) -> Option<Vec<&String>> {
-        match self.rooms.len() {
-            0 => None,
-            _ => Some(self.rooms.keys().collect()),
-        }
-    }
-
-    pub fn devices(&self, room: &str) -> Option<&Vec<String>> {
-        self.rooms.get(room)
-    }
-
-    pub fn add_room(mut self, room_name: &str, device_name: &[&str]) -> Self {
-        let device_list = device_name.iter().map(|d| d.to_string()).collect();
-        self.rooms.insert(room_name.into(), device_list);
+    pub fn add_room(mut self, room: Room) -> Self {
+        let room_name = room.name.clone();
+        self.rooms.insert(room_name, room);
         self
     }
 
-    pub fn create_report<T: DeviceInfoProvider>(&self, info_provider: &T) -> String {
-        let mut report = format!("");
-        for (room_name, device) in self.rooms.iter() {
-            for device_name in device {
-                write!(report, "{} - Device {} : ", room_name, device_name).unwrap();
-                match info_provider.get_device_info(device_name) {
-                    Ok(s) => writeln!(report, "{}", s).unwrap(),
+    pub fn remove_room(&mut self, name: &str) -> Option<Room> {
+        self.rooms.remove(name)
+    }
+
+    pub fn get_room_list(&self) -> Vec<String> {
+        self.rooms.keys().cloned().collect()
+    }
+
+    pub fn get_room_device_list(&self, room_name: &str) -> Option<Vec<String>> {
+        self.rooms.get(room_name).map(|room| room.get_device_list())
+    }
+
+    pub fn create_report(&self) -> String {
+        let mut report = format!("{} ", self.name);
+        for (room_name, room) in self.rooms.iter() {
+            for (_device_name, device) in room.devices.iter() {
+                write!(report, "{}", room_name).unwrap();
+                match device.state() {
+                    Ok(ok) => writeln!(report, "{}", ok).unwrap(),
                     Err(e) => writeln!(report, "{:?}", e).unwrap(),
                 };
             }
@@ -48,26 +54,93 @@ impl SmartHouse {
     }
 }
 
+impl Room {
+    pub fn new(name: &str) -> Self {
+        Self {
+            name: name.into(),
+            devices: HashMap::new(),
+        }
+    }
+
+    pub fn add_device(mut self, device: Rc<dyn Device>) -> Self {
+        self.devices.insert(device.get_name(), device);
+        self
+    }
+
+    pub fn remove_device(&mut self, name: &str) -> Option<Rc<dyn Device>> {
+        self.devices.remove(name)
+    }
+
+    pub fn get_device_list(&self) -> Vec<String> {
+        self.devices.keys().cloned().collect()
+    }
+}
+
 #[cfg(test)]
+
 mod tests {
     use super::*;
     #[test]
-    fn test_fn_new() {
+    fn test_room_new() {
         let home = SmartHouse::new("SM");
         assert_eq!(home.name, "SM");
-        assert_eq!(home.rooms, HashMap::new());
     }
 
     #[test]
-    fn test_get_rooms() {
-        let home = SmartHouse::new("SM").add_room("room_name", &["device_name"]);
-        assert_ne!(home.get_rooms(), None);
+    fn test_add_room() {
+        let home = SmartHouse::new("SM").add_room(Room::new("Room # 1"));
+        assert_eq!(home.rooms.len(), 1);
     }
 
     #[test]
-    fn test_get_device() {
-        let home = SmartHouse::new("SM");
-        let room = home.add_room("room_name", &["device_name"]);
-        assert_eq!(room.devices("room"), None);
+    fn test_remove_room() {
+        let mut home = SmartHouse::new("SM")
+            .add_room(Room::new("Room # 1"))
+            .add_room(Room::new("Room # 2"));
+        assert!(home.remove_room("Room # 1").is_some());
+        assert_eq!(home.rooms.len(), 1);
+    }
+
+    #[test]
+    fn test_get_room_list() {
+        let home = SmartHouse::new("SM")
+            .add_room(Room::new("Room # 1"))
+            .add_room(Room::new("Room # 2"));
+        let mut room_list = home.get_room_list();
+        room_list.sort();
+        assert_eq!(room_list, vec!["Room # 1", "Room # 2"]);
+    }
+
+    use crate::devices::SmartSocket;
+    #[test]
+    fn test_device_new() {
+        let device = Rc::new(SmartSocket::new("Socket 1"));
+        assert_eq!(device.name, "Socket 1");
+    }
+
+    #[test]
+    fn test_add_device() {
+        let device = Rc::new(SmartSocket::new("Socket 1"));
+        let room = Room::new("Room # 1").add_device(device);
+        assert_eq!(room.devices.len(), 1);
+    }
+
+    #[test]
+    fn test_remove_device() {
+        let device1 = Rc::new(SmartSocket::new("Socket 1"));
+        let device2 = Rc::new(SmartSocket::new("Socket 2"));
+        let mut room = Room::new("room_1").add_device(device1).add_device(device2);
+        assert!(room.remove_device("Socket 1").is_some());
+        assert_eq!(room.devices.len(), 1);
+    }
+
+    #[test]
+    fn test_get_device_list() {
+        let device1 = Rc::new(SmartSocket::new("Socket 1"));
+        let device2 = Rc::new(SmartSocket::new("Socket 2"));
+        let room = Room::new("room_1").add_device(device1).add_device(device2);
+        let mut device_list = room.get_device_list();
+        device_list.sort();
+        assert_eq!(device_list, vec!["Socket 1", "Socket 2"]);
     }
 }

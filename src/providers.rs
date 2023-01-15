@@ -19,25 +19,32 @@ pub enum ProviderError {
     DeviceNotFound(String),
 }
 
-pub trait ErrDevice {
+pub trait Device {
     fn state(&self) -> Result<String, DeviceError>;
+    fn get_name(&self) -> String;
 }
 
-impl ErrDevice for SmartSocket {
+impl Device for SmartSocket {
     fn state(&self) -> Result<String, DeviceError> {
         Ok(format!(
-            "Device name is: {}, state is: {}, power is: {} A.",
+            " Device name is: {}, state is: {}, power is: {} A.",
             self.name, self.data, self.power
         ))
     }
+    fn get_name(&self) -> String {
+        self.name.clone()
+    }
 }
 
-impl ErrDevice for SmartThermometer {
+impl Device for SmartThermometer {
     fn state(&self) -> Result<String, DeviceError> {
         Ok(format!(
-            "Device name is: {}, state is: {}, temperature is: {} °C.",
+            " Device name is: {}, state is: {}, temperature is: {} °C.",
             self.name, self.data, self.temperature
         ))
+    }
+    fn get_name(&self) -> String {
+        self.name.clone()
     }
 }
 
@@ -50,6 +57,7 @@ impl DeviceInfoProvider for OwningDeviceInfoProvider {
         if self.socket.name == device {
             Ok(self.socket.state().expect("error socket"))
         } else {
+            #[warn(clippy::needless_return)]
             return Err(ProviderError::DeviceNotFound(device.to_string()));
         }
     }
@@ -62,6 +70,7 @@ impl DeviceInfoProvider for BorrowingDeviceInfoProvider<'_, '_> {
         } else if self.thermo.name == device {
             Ok(self.thermo.state().expect("error thermometr"))
         } else {
+            #[warn(clippy::needless_return)]
             return Err(ProviderError::DeviceNotFound(device.to_string()));
         }
     }
