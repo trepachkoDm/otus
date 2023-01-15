@@ -1,24 +1,29 @@
 use smart_home::devices::{SmartSocket, SmartThermometer};
-use smart_home::home::SmartHouse;
-use smart_home::providers::{BorrowingDeviceInfoProvider, OwningDeviceInfoProvider};
+use smart_home::home::{Room, SmartHouse};
+use std::rc::Rc;
 
 fn main() {
-    let socket1 = SmartSocket::new("socket1");
-    let socket2 = SmartSocket::new("socket2");
-    let thermo1 = SmartThermometer::new("thermometer1");
+    let socket1 = Rc::new(SmartSocket::new("Socket 1"));
+    let socket2 = Rc::new(SmartSocket::new("Socket 2"));
+    let thermo1 = Rc::new(SmartThermometer::new("Thermometer 1"));
 
-    let house = SmartHouse::new("Smart House")
-        .add_room("room 1", &["socket1"])
-        .add_room("room 2", &["socket2", "thermometer1"]);
-    let info_provider_1 = OwningDeviceInfoProvider { socket: socket1 };
+    let mut house = SmartHouse::new("Smart House")
+        .add_room(Room::new("Room 1").add_device(socket1))
+        .add_room(Room::new("Room 2").add_device(socket2))
+        .add_room(Room::new("Room 3").add_device(thermo1));
 
-    let info_provider_2 = BorrowingDeviceInfoProvider {
-        thermo: &thermo1,
-        socket: &socket2,
-    };
+    let report = house.create_report();
+    println!("Report #Add:\n {report}");
 
-    let report1 = house.create_report(&info_provider_1);
-    let report2 = house.create_report(&info_provider_2);
-    println!("Report #1:\n {report1}");
-    println!("Report #2:\n {report2}");
+    house.remove_room("Room 1");
+    let report_remove = house.create_report();
+    println!("Report #Remove:\n {report_remove}");
+
+    house.get_room_list();
+    let report_get_room_list = house.create_report();
+    println!("Report #Get room list:\n {report_get_room_list}");
+
+    house.get_room_device_list("Room 2");
+    let report_get_room_device_list = house.create_report();
+    println!("Report #Device list:\n {report_get_room_device_list}");
 }
