@@ -1,4 +1,5 @@
 use crate::devices::{SmartSocket, SmartThermometer};
+use thiserror::Error;
 
 pub struct OwningDeviceInfoProvider {
     pub socket: SmartSocket,
@@ -8,14 +9,19 @@ pub struct BorrowingDeviceInfoProvider<'a, 'b> {
     pub thermo: &'b SmartThermometer,
 }
 
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum DeviceError {
+    #[error("Socket error: {0}")]
     SocketError(String),
+    #[error("Thermometr error: {0}")]
     ThermoError(String),
 }
-#[derive(Debug)]
+
+#[derive(Error, Debug)]
 pub enum ProviderError {
-    DeviceError(DeviceError),
+    #[error("Device error: {0}")]
+    DeviceError(#[from] DeviceError),
+    #[error("Device not found: {0}")]
     DeviceNotFound(String),
 }
 
@@ -55,10 +61,9 @@ pub trait DeviceInfoProvider {
 impl DeviceInfoProvider for OwningDeviceInfoProvider {
     fn get_device_info(&self, device: &str) -> Result<String, ProviderError> {
         if self.socket.name == device {
-            Ok(self.socket.state().expect("error socket"))
+            Ok(self.socket.state()?)
         } else {
-            #[warn(clippy::needless_return)]
-            return Err(ProviderError::DeviceNotFound(device.to_string()));
+            Err(ProviderError::DeviceNotFound(device.to_string()))
         }
     }
 }
@@ -66,12 +71,11 @@ impl DeviceInfoProvider for OwningDeviceInfoProvider {
 impl DeviceInfoProvider for BorrowingDeviceInfoProvider<'_, '_> {
     fn get_device_info(&self, device: &str) -> Result<String, ProviderError> {
         if self.socket.name == device {
-            Ok(self.socket.state().expect("error socket"))
+            Ok(self.socket.state()?)
         } else if self.thermo.name == device {
-            Ok(self.thermo.state().expect("error thermometr"))
+            Ok(self.thermo.state()?)
         } else {
-            #[warn(clippy::needless_return)]
-            return Err(ProviderError::DeviceNotFound(device.to_string()));
+            Err(ProviderError::DeviceNotFound(device.to_string()))
         }
     }
 }
